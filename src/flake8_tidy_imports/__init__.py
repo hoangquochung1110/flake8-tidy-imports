@@ -65,6 +65,16 @@ class ImportChecker:
             help="Ban relative imports, from parental modules or in all cases.",
         )
 
+        parser.add_option(
+            "--idiomatic-imports",
+            action="store",
+            parse_from_config=True,
+            default="",
+            help=(
+                "Idiomatic imports",
+            ),
+        )
+
     @classmethod
     def parse_options(cls, options: Any) -> None:
         lines = [
@@ -73,6 +83,7 @@ class ImportChecker:
         cls.banned_modules = {}
         cls.banned_structured_patterns = []
         cls.banned_unstructured_patterns = []
+        cls.idiomatic_imports = {}
         for line in lines:
             if line == "{python2to3}":
                 cls.banned_modules.update(cls.python2to3_banned_modules)
@@ -104,11 +115,23 @@ class ImportChecker:
 
         cls.ban_relative_imports = options.ban_relative_imports
 
+        idiom_lines = [
+            idiom.strip() for idiom in options.idiomatic_imports.split("\n") if idiom.strip()
+        ]
+        for line in idiom_lines:
+            idioms = cls.compose_idioms(line)
+            for (module_name, alias_name) in idioms:
+                cls.idiomatic_imports[module_name] = {
+                    "alias": alias_name,
+                    "idiom": line,
+                }
+
     message_I250 = "I250 Unnecessary import alias - rewrite as '{}'."
     message_I251 = "I251 Banned import '{name}' used - {msg}."
+    message_I253 = "I253 Banned import '{name}'. Use '{msg}'."
 
     def run(self) -> Generator[tuple[int, int, str, type[Any]], None, None]:
-        rule_funcs = (self.rule_I250, self.rule_I251, self.rule_I252)
+        rule_funcs = (self.rule_I250, self.rule_I251, self.rule_I252,self.rule_I253)
         for node in ast.walk(self.tree):
             for rule_func in rule_funcs:
                 yield from rule_func(node)
@@ -177,6 +200,26 @@ class ImportChecker:
                 return True, msg
 
         return False, ""
+    
+    def _is_idiom_banned(self, module_name: str, sentinel: str) -> tuple[bool, str]:
+        if module_name in self.idiomatic_imports.keys():
+            if self.idiomatic_imports[module_name]["alias"] != sentinel:
+                return True, self.idiomatic_imports[module_name]["idiom"]
+        return False, ""
+    
+    @staticmethod
+    def compose_idioms(idiom: str) -> tuple:
+        node = ast.parse(idiom).body[0]
+        if isinstance(node, ast.Import):
+            banned_modules = [
+                (alias.name, alias.asname) for alias in node.names
+            ]
+            return banned_modules
+        elif isinstance(node, ast.ImportFrom):
+            banned_modules = [
+                (".".join([node.module, alias.name]), "") for alias in node.names
+            ]
+            return banned_modules
 
     def rule_I251(
         self, node: ast.AST
@@ -226,6 +269,39 @@ class ImportChecker:
             and node.level > min_node_level
         ):
             yield (node.lineno, node.col_offset, message, type(self))
+
+    def rule_I253(
+        self, node: ast.AST
+    ) -> Generator[tuple[int, int, str, type[Any]], None, None]:
+        if not self.idiomatic_imports:
+            return
+        if isinstance(node, ast.Import):
+            module_names = [alias.name for alias in node.names]
+            module_alias_names = [alias.asname for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            node_module = node.module
+            module_names = [node_module]
+            module_alias_names = [None]
+        else:
+            return
+        
+        # Sort from most to least specific paths.
+        module_names.sort(key=len, reverse=True)
+
+        warned: set[str] = set()
+
+        for module_name, alias_module_name in zip(module_names, module_alias_names):
+            is_banned, msg = self._is_idiom_banned(module_name, alias_module_name)
+            if is_banned:
+                message = self.message_I253.format(name=module_name, msg=msg)
+                if any(mod.startswith(module_name) for mod in warned):
+                    # Do not show an error for this line if we already showed
+                    # a more specific error.
+                    continue
+                else:
+                    warned.add(module_name)
+                yield (node.lineno, node.col_offset, message, type(self))
+
 
     python2to3_banned_modules = {
         "__builtin__": "use six.moves.builtins as a drop-in replacement",

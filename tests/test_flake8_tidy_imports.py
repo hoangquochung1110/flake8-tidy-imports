@@ -590,6 +590,7 @@ def test_I251_is_module_banned(banned_module, imported_module, expected):
     checker = ImportChecker(Mock())
     options = Mock()
     options.banned_modules = banned_modules_str
+    options.idiomatic_imports = ""
     options.ban_relative_imports = False
 
     # Make sure we get the expected result on the module we're trying to import
@@ -782,4 +783,87 @@ def test_I252_relative_import_parents_commandline(flake8_path):
     result = flake8_path.run_flake8(["--ban-relative-imports=parents"])
     assert result.out_lines == [
         "./example.py:1:1: I252 Relative imports from parent modules are banned."
+    ]
+
+
+@pytest.mark.parametrize(
+    "suggested_idiom, imported_module, as_name, expected",
+    (
+        ("import datetime as dt", "datetime", "dt", False),
+        ("from django.db import models", "django.db", None, False),
+        ("import pandas as pd", "pandas", None, True),
+        ("from django.db import models", "django.db.models", None, True),
+        ("from django.db import models", "django.db.models", "django.db", True),
+        ("from django.db import models, utils", "django.db.utils", None, True),
+
+    )
+)
+def test_I253_is_idiom_banned(suggested_idiom, imported_module, as_name, expected):
+    # Set up a simple banned-modules string
+    idiomatic_imports_str = f"{suggested_idiom}"
+
+    # Set up an ImportChecker and pass the options in
+    checker = ImportChecker(Mock())
+    options = Mock()
+    options.banned_modules = ""
+    options.idiomatic_imports = idiomatic_imports_str
+
+    # Make sure we get the expected result on the module we're trying to import
+    checker.parse_options(options)
+    is_banned, _ = checker._is_idiom_banned(imported_module, as_name)
+    assert is_banned is expected
+
+
+def test_I253_idiom_match(flake8_path):
+    (flake8_path / "example.py").write_text(
+        dedent(
+            """\
+            from foo.bar import baz, qux
+
+            baz
+            qux
+            """
+        )
+    )
+    (flake8_path / "setup.cfg").write_text(
+        default_setup_cfg + "idiomatic-imports = from foo.bar import baz"
+    )
+    result = flake8_path.run_flake8()
+    assert result.out_lines == []
+
+
+def test_I253_idiom_bypass(flake8_path):
+    (flake8_path / "example.py").write_text(
+        dedent(
+            """\
+            from foo import bar
+
+            baz
+            qux
+            """
+        )
+    )
+    (flake8_path / "setup.cfg").write_text(
+        default_setup_cfg + "idiomatic-imports = from foo.bar import baz"
+    )
+    result = flake8_path.run_flake8()
+    assert result.out_lines == []
+
+
+def test_I253_idiom_mismatch_1(flake8_path):
+    (flake8_path / "example.py").write_text(
+        dedent(
+            """\
+            from foo.bar.baz import qux
+
+            qux
+            """
+        )
+    )
+    (flake8_path / "setup.cfg").write_text(
+        default_setup_cfg + "idiomatic-imports = from foo.bar import baz"
+    )
+    result = flake8_path.run_flake8()
+    assert result.out_lines == [
+        "./example.py:1:1: I253 Banned import 'foo.bar.baz'. Use 'from foo.bar import baz'."
     ]
