@@ -115,20 +115,18 @@ class ImportChecker:
 
         cls.ban_relative_imports = options.ban_relative_imports
 
-        idiom_lines = [
-            idiom.strip() for idiom in options.idiomatic_imports.split("\n") if idiom.strip()
-        ]
-        for line in idiom_lines:
-            idioms = cls.compose_idioms(line)
+        parsed_import_statements = cls.parse_idiomatic_imports(options.idiomatic_imports)
+        for statement in parsed_import_statements:
+            idioms = cls.compose_idioms(statement)
             for (module_name, alias_name) in idioms:
                 cls.idiomatic_imports[module_name] = {
                     "alias": alias_name,
-                    "idiom": line,
+                    "idiom": statement,
                 }
 
     message_I250 = "I250 Unnecessary import alias - rewrite as '{}'."
     message_I251 = "I251 Banned import '{name}' used - {msg}."
-    message_I253 = "I253 Banned import '{name}'. Use '{msg}'."
+    message_I253 = "I253 Ban '{name}'. Use '{msg}'."
 
     def run(self) -> Generator[tuple[int, int, str, type[Any]], None, None]:
         rule_funcs = (self.rule_I250, self.rule_I251, self.rule_I252,self.rule_I253)
@@ -201,10 +199,39 @@ class ImportChecker:
 
         return False, ""
     
-    def _is_idiom_banned(self, module_name: str, sentinel: str) -> tuple[bool, str]:
-        if module_name in self.idiomatic_imports.keys():
-            if self.idiomatic_imports[module_name]["alias"] != sentinel:
-                return True, self.idiomatic_imports[module_name]["idiom"]
+    def parse_idiomatic_imports(lines: str) -> list[str]:
+        # Turn comma-separated import into single imports
+        stripped_lines = [
+            idiom.strip() for idiom in lines.split("\n") if idiom.strip()
+        ]
+        import_from_pattern = r"from ([\w\d.]+) import (.*)"
+        parsed_lines = []
+
+        for import_statement in stripped_lines:
+            match = re.match(import_from_pattern, import_statement)
+            if match:
+                module_name = match.group(1)
+                import_names = match.group(2).split(", ")
+                import_statements = [f"from {module_name} import {name}" for name in import_names]
+                parsed_lines.extend(import_statements)
+            else:
+                parsed_lines.append(import_statement)
+
+        return parsed_lines
+    
+    def _is_idiom_banned(self, module_name: str, alias_name: str) -> tuple[bool, str]:
+        for key, value in self.idiomatic_imports.items():
+            if module_name == key:
+                # import exactly as idiomatic-imports
+                if (
+                    value["alias"] 
+                    and value["alias"] != alias_name
+                ):
+                    # check if idiomatic-imports declared with alias
+                    return True, value["idiom"]
+            elif key in module_name:
+                # import more verbosely than idiomatic-imports
+                return True, value["idiom"]
         return False, ""
     
     @staticmethod
@@ -217,7 +244,7 @@ class ImportChecker:
             return banned_modules
         elif isinstance(node, ast.ImportFrom):
             banned_modules = [
-                (".".join([node.module, alias.name]), "") for alias in node.names
+                (".".join([node.module, alias.name]), alias.asname) for alias in node.names
             ]
             return banned_modules
 
@@ -280,8 +307,8 @@ class ImportChecker:
             module_alias_names = [alias.asname for alias in node.names]
         elif isinstance(node, ast.ImportFrom):
             node_module = node.module
-            module_names = [node_module]
-            module_alias_names = [None]
+            module_names = [".".join([node_module, alias.name]) for alias in node.names]
+            module_alias_names = [alias.asname for alias in node.names]
         else:
             return
         
@@ -293,7 +320,7 @@ class ImportChecker:
         for module_name, alias_module_name in zip(module_names, module_alias_names):
             is_banned, msg = self._is_idiom_banned(module_name, alias_module_name)
             if is_banned:
-                message = self.message_I253.format(name=module_name, msg=msg)
+                message = self.message_I253.format(name=ast.unparse(node), msg=msg)
                 if any(mod.startswith(module_name) for mod in warned):
                     # Do not show an error for this line if we already showed
                     # a more specific error.

@@ -786,16 +786,18 @@ def test_I252_relative_import_parents_commandline(flake8_path):
     ]
 
 
+# I253
+I253_stdout = "./example.py:1:1: I253 Ban '{statement}'. Use '{idiomatic_imports}'."
+
 @pytest.mark.parametrize(
     "suggested_idiom, imported_module, as_name, expected",
     (
         ("import datetime as dt", "datetime", "dt", False),
-        ("from django.db import models", "django.db", None, False),
-        ("import pandas as pd", "pandas", None, True),
-        ("from django.db import models", "django.db.models", None, True),
-        ("from django.db import models", "django.db.models", "django.db", True),
-        ("from django.db import models, utils", "django.db.utils", None, True),
-
+        ("from django.db import models", "django.db.models", "", False),
+        ("import pandas as pd", "pandas", "", True),
+        ("from django.db import models", "django.db.models", "", False),        
+        ("from django.db import models", "django.db.models.Q", "", True),
+        ("from foo.bar.baz import qux", "foo.bar.baz.qux", "", False)
     )
 )
 def test_I253_is_idiom_banned(suggested_idiom, imported_module, as_name, expected):
@@ -832,14 +834,64 @@ def test_I253_idiom_match(flake8_path):
     assert result.out_lines == []
 
 
+def test_I253_comma_separated_import(flake8_path):
+    import_statement = "from foo.bar.baz import corge"
+
+    (flake8_path / "example.py").write_text(
+        dedent(
+            f"""\
+            {import_statement}
+
+            corge
+            """
+        )
+    )
+    (flake8_path / "setup.cfg").write_text(
+        default_setup_cfg + "idiomatic-imports = from foo.bar import baz, qux"
+    )
+    result = flake8_path.run_flake8()
+    assert result.out_lines == [
+        I253_stdout.format(
+            statement=import_statement,
+            idiomatic_imports="from foo.bar import baz")
+    ]
+
+
+@pytest.mark.parametrize(
+    "idiomatic_imports, import_statement, client_code",
+    (
+        ("from foo.bar import baz", "from foo.bar.baz import qux", "qux"),
+        ("from django.utils import timezone as dj_timezone", "from django.utils import timezone", "timezone"),
+        ("from django.utils import timezone as dj_timezone", "from django.utils.timezone import localdate", "localdate"),
+
+    )
+)
+def test_I253_import_statement_banned(flake8_path, idiomatic_imports, import_statement, client_code):
+    (flake8_path / "example.py").write_text(
+        dedent(
+            f"""\
+            {import_statement}
+
+            {client_code}
+            """
+        )
+    )
+    (flake8_path / "setup.cfg").write_text(
+        default_setup_cfg + f"idiomatic-imports = {idiomatic_imports}"
+    )
+    result = flake8_path.run_flake8()
+    assert result.out_lines == [
+        f"./example.py:1:1: I253 Ban '{import_statement}'. Use '{idiomatic_imports}'."
+    ]
+
+
 def test_I253_idiom_bypass(flake8_path):
     (flake8_path / "example.py").write_text(
         dedent(
             """\
             from foo import bar
 
-            baz
-            qux
+            bar
             """
         )
     )
@@ -848,22 +900,3 @@ def test_I253_idiom_bypass(flake8_path):
     )
     result = flake8_path.run_flake8()
     assert result.out_lines == []
-
-
-def test_I253_idiom_mismatch_1(flake8_path):
-    (flake8_path / "example.py").write_text(
-        dedent(
-            """\
-            from foo.bar.baz import qux
-
-            qux
-            """
-        )
-    )
-    (flake8_path / "setup.cfg").write_text(
-        default_setup_cfg + "idiomatic-imports = from foo.bar import baz"
-    )
-    result = flake8_path.run_flake8()
-    assert result.out_lines == [
-        "./example.py:1:1: I253 Banned import 'foo.bar.baz'. Use 'from foo.bar import baz'."
-    ]
