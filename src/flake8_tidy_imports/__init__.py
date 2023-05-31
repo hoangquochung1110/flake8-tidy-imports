@@ -118,11 +118,8 @@ class ImportChecker:
         parsed_import_statements = cls.parse_idiomatic_imports(options.idiomatic_imports)
         for statement in parsed_import_statements:
             idioms = cls.compose_idioms(statement)
-            for (module_name, alias_name) in idioms:
-                cls.idiomatic_imports[module_name] = {
-                    "alias": alias_name,
-                    "idiom": statement,
-                }
+            for idiom in idioms:
+                cls.idiomatic_imports.update(idiom)
 
     message_I250 = "I250 Unnecessary import alias - rewrite as '{}'."
     message_I251 = "I251 Banned import '{name}' used - {msg}."
@@ -200,7 +197,7 @@ class ImportChecker:
         return False, ""
     
     def parse_idiomatic_imports(lines: str) -> list[str]:
-        # Turn comma-separated import into single imports
+        # Turn comma-separated import into single import
         stripped_lines = [
             idiom.strip() for idiom in lines.split("\n") if idiom.strip()
         ]
@@ -235,18 +232,27 @@ class ImportChecker:
         return False, ""
     
     @staticmethod
-    def compose_idioms(idiom: str) -> tuple:
+    def compose_idioms(idiom: str) -> list[dict[dict]]:
         node = ast.parse(idiom).body[0]
+        banned_modules = []
+
         if isinstance(node, ast.Import):
-            banned_modules = [
-                (alias.name, alias.asname) for alias in node.names
-            ]
-            return banned_modules
+            for alias in node.names:
+                banned_modules.append(
+                    {alias.name: {
+                        "alias": alias.asname,
+                        "idiom": idiom,
+                    }}
+                )
         elif isinstance(node, ast.ImportFrom):
-            banned_modules = [
-                (".".join([node.module, alias.name]), alias.asname) for alias in node.names
-            ]
-            return banned_modules
+            for alias in node.names:
+                banned_modules.append(
+                    {".".join([node.module, alias.name]): {
+                        "alias": alias.asname,
+                        "idiom": idiom,
+                    }}
+                )
+        return banned_modules
 
     def rule_I251(
         self, node: ast.AST
