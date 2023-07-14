@@ -590,7 +590,7 @@ def test_I251_is_module_banned(banned_module, imported_module, expected):
     checker = ImportChecker(Mock())
     options = Mock()
     options.banned_modules = banned_modules_str
-    options.idiomatic_imports = ""
+    options.import_idioms = ""
     options.ban_relative_imports = False
 
     # Make sure we get the expected result on the module we're trying to import
@@ -806,7 +806,7 @@ def test_I253_is_idiom_banned(suggested_idiom, imported_module, as_name, expecte
     checker = ImportChecker(Mock())
     options = Mock()
     options.banned_modules = ""
-    options.idiomatic_imports = idiomatic_imports_str
+    options.import_idioms = idiomatic_imports_str
 
     # Make sure we get the expected result on the module we're trying to import
     checker.parse_options(options)
@@ -826,7 +826,7 @@ def test_I253_idiom_match(flake8_path):
         )
     )
     (flake8_path / "setup.cfg").write_text(
-        default_setup_cfg + "idiomatic-imports = from foo.bar import baz"
+        default_setup_cfg + "import-idioms = from foo.bar import baz"
     )
     result = flake8_path.run_flake8()
     assert result.out_lines == []
@@ -845,7 +845,7 @@ def test_I253_check_output_of_comma_separated_import_banned(flake8_path):
         )
     )
     (flake8_path / "setup.cfg").write_text(
-        default_setup_cfg + "idiomatic-imports = from foo.bar import baz, qux"
+        default_setup_cfg + "import-idioms = from foo.bar import baz, qux"
     )
     result = flake8_path.run_flake8()
     assert result.out_lines == [
@@ -875,7 +875,7 @@ def test_I253_import_statement_banned(flake8_path, idiomatic_imports, import_sta
         )
     )
     (flake8_path / "setup.cfg").write_text(
-        default_setup_cfg + f"idiomatic-imports = {idiomatic_imports}"
+        default_setup_cfg + f"import-idioms = {idiomatic_imports}"
     )
     result = flake8_path.run_flake8()
     assert result.out_lines == [
@@ -894,7 +894,7 @@ def test_I253_idiom_bypass(flake8_path):
         )
     )
     (flake8_path / "setup.cfg").write_text(
-        default_setup_cfg + "idiomatic-imports = from foo.bar import baz"
+        default_setup_cfg + "import-idioms = from foo.bar import baz"
     )
     result = flake8_path.run_flake8()
     assert result.out_lines == []

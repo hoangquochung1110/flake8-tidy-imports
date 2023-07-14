@@ -95,7 +95,7 @@ For example:
 
 (If you want to ban absolute imports, you can put your project's modules in ``banned-modules``.)
 
-``idiomatic-imports``
+``import-idioms``
 ---------------------
 
 Config for rule I253 (below). Should contain a list where each line is a recommended import statement to follow.
@@ -176,15 +176,14 @@ Absolute imports, or relative imports from siblings, are recommended by `PEP8 <h
         from . import sibling
         from .sibling import example
 
-I253: Enforce <idiomatic_import> statements.
+I253: Enforce <import-idioms> statements.
 -------------------------------------------
 
-Similar to `I251 <https://github.com/adamchainz/flake8-tidy-imports#i251-banned-import-import-used>`__ rule but more rigorous.
-Complains if you don't follow ``idiomatic-imports`` pattern.
+Complains if you don't follow ``import-idioms`` pattern.
 
 By default, there are no idiomatic imports - you should configure them with ``idiomatic-imports`` as described above in 'Options'.
 
-The message has two part: banned import and suggested import
+The message has two part: banned import and required import
 
 .. code-block:: sh
 

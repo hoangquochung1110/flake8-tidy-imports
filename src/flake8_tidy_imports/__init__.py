@@ -66,7 +66,7 @@ class ImportChecker:
         )
 
         parser.add_option(
-            "--idiomatic-imports",
+            "--import-idioms",
             action="store",
             parse_from_config=True,
             default="",
@@ -83,7 +83,7 @@ class ImportChecker:
         cls.banned_modules = {}
         cls.banned_structured_patterns = []
         cls.banned_unstructured_patterns = []
-        cls.idiomatic_imports = {}
+        cls.import_idioms = {}
         for line in lines:
             if line == "{python2to3}":
                 cls.banned_modules.update(cls.python2to3_banned_modules)
@@ -115,11 +115,11 @@ class ImportChecker:
 
         cls.ban_relative_imports = options.ban_relative_imports
 
-        parsed_import_statements = cls.parse_idiomatic_imports(options.idiomatic_imports)
+        parsed_import_statements = cls.parse_idiomatic_imports(options.import_idioms)
         for statement in parsed_import_statements:
             idioms = cls.compose_idioms(statement)
             for idiom in idioms:
-                cls.idiomatic_imports.update(idiom)
+                cls.import_idioms.update(idiom)
 
     message_I250 = "I250 Unnecessary import alias - rewrite as '{}'."
     message_I251 = "I251 Banned import '{name}' used - {msg}."
@@ -196,6 +196,21 @@ class ImportChecker:
 
         return False, ""
     
+    def _is_idiom_banned(self, module_name: str, alias_name: str) -> tuple[bool, str]:
+        for key, value in self.import_idioms.items():
+            if module_name == key:
+                # import exactly as idiomatic-imports
+                if (
+                    value["alias"] 
+                    and value["alias"] != alias_name
+                ):
+                    # check if idiomatic-imports declared with alias
+                    return True, value["idiom"]
+            elif key in module_name:
+                # import more verbosely than idiomatic-imports
+                return True, value["idiom"]
+        return False, ""
+    
     def parse_idiomatic_imports(lines: str) -> list[str]:
         # Turn comma-separated import into single import
         stripped_lines = [
@@ -215,21 +230,6 @@ class ImportChecker:
                 parsed_lines.append(import_statement)
 
         return parsed_lines
-    
-    def _is_idiom_banned(self, module_name: str, alias_name: str) -> tuple[bool, str]:
-        for key, value in self.idiomatic_imports.items():
-            if module_name == key:
-                # import exactly as idiomatic-imports
-                if (
-                    value["alias"] 
-                    and value["alias"] != alias_name
-                ):
-                    # check if idiomatic-imports declared with alias
-                    return True, value["idiom"]
-            elif key in module_name:
-                # import more verbosely than idiomatic-imports
-                return True, value["idiom"]
-        return False, ""
     
     @staticmethod
     def compose_idioms(idiom: str) -> list[dict[dict]]:
@@ -306,7 +306,7 @@ class ImportChecker:
     def rule_I253(
         self, node: ast.AST
     ) -> Generator[tuple[int, int, str, type[Any]], None, None]:
-        if not self.idiomatic_imports:
+        if not self.import_idioms:
             return
         if isinstance(node, ast.Import):
             module_names = [alias.name for alias in node.names]
