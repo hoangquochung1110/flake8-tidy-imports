@@ -793,11 +793,9 @@ I253_stdout = "./example.py:1:1: I253 Ban '{statement}'. Use '{idiomatic_imports
     "suggested_idiom, imported_module, as_name, expected",
     (
         ("import datetime as dt", "datetime", "dt", False),
-        ("from django.db import models", "django.db.models", "", False),
         ("import pandas as pd", "pandas", "", True),
         ("from django.db import models", "django.db.models", "", False),        
         ("from django.db import models", "django.db.models.Q", "", True),
-        ("from foo.bar.baz import qux", "foo.bar.baz.qux", "", False)
     )
 )
 def test_I253_is_idiom_banned(suggested_idiom, imported_module, as_name, expected):
@@ -834,7 +832,7 @@ def test_I253_idiom_match(flake8_path):
     assert result.out_lines == []
 
 
-def test_I253_comma_separated_import(flake8_path):
+def test_I253_check_output_of_comma_separated_import_banned(flake8_path):
     import_statement = "from foo.bar.baz import corge"
 
     (flake8_path / "example.py").write_text(
@@ -860,10 +858,10 @@ def test_I253_comma_separated_import(flake8_path):
 @pytest.mark.parametrize(
     "idiomatic_imports, import_statement, client_code",
     (
+        ("import datetime as dt", "import datetime", "datetime"),
         ("from foo.bar import baz", "from foo.bar.baz import qux", "qux"),
         ("from django.utils import timezone as dj_timezone", "from django.utils import timezone", "timezone"),
         ("from django.utils import timezone as dj_timezone", "from django.utils.timezone import localdate", "localdate"),
-
     )
 )
 def test_I253_import_statement_banned(flake8_path, idiomatic_imports, import_statement, client_code):

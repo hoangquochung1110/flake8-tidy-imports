@@ -71,7 +71,7 @@ class ImportChecker:
             parse_from_config=True,
             default="",
             help=(
-                "Idiomatic imports",
+                "A list of required import statements to comply.",
             ),
         )
 
