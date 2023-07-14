@@ -176,11 +176,11 @@ Absolute imports, or relative imports from siblings, are recommended by `PEP8 <h
         from . import sibling
         from .sibling import example
 
-I253: Ban <import>. Use <idiomatic_import>.
+I253: Enforce <idiomatic_import> statements.
 -------------------------------------------
 
-Similar to `I251 <https://github.com/adamchainz/flake8-tidy-imports#i251-banned-import-import-used> ` rule but more rigorous.
-Force you to comply with pre-configured idiomatic imports and complain if your imports do not match.
+Similar to `I251 <https://github.com/adamchainz/flake8-tidy-imports#i251-banned-import-import-used>` rule but more rigorous.
+Complains if you don't follow ``idiomatic-imports`` pattern.
 
 By default, there are no idiomatic imports - you should configure them with ``idiomatic-imports`` as described above in 'Options'.
 
