@@ -105,7 +105,7 @@ For example in ``setup.cfg``:
 .. code-block:: ini
 
     [flake8]
-    idiomatic-imports =
+    import-idioms =
       import datetime as dt
       from django.db import modules
       from django.utils import timezone as dj_timezone
@@ -181,7 +181,7 @@ I253: Enforce <import-idioms> statements.
 
 Complains if you don't follow ``import-idioms`` pattern.
 
-By default, there are no idiomatic imports - you should configure them with ``idiomatic-imports`` as described above in 'Options'.
+By default, there are no import idioms - you should configure them with ``import-idioms`` as described above in 'Options'.
 
 The message has two part: banned import and required import
 
