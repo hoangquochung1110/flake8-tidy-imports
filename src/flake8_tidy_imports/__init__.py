@@ -71,7 +71,7 @@ class ImportChecker:
             parse_from_config=True,
             default="",
             help=(
-                "A list of required import statements to comply.",
+                "A list of required import statements to enforce.",
             ),
         )
 
@@ -115,7 +115,7 @@ class ImportChecker:
 
         cls.ban_relative_imports = options.ban_relative_imports
 
-        parsed_import_statements = cls.parse_idiomatic_imports(options.import_idioms)
+        parsed_import_statements = cls.parse_import_idioms(options.import_idioms)
         for statement in parsed_import_statements:
             idioms = cls.compose_idioms(statement)
             for idiom in idioms:
@@ -211,8 +211,9 @@ class ImportChecker:
                 return True, value["idiom"]
         return False, ""
     
-    def parse_idiomatic_imports(lines: str) -> list[str]:
-        # Turn comma-separated import into single import
+    def parse_import_idioms(lines: str) -> list[str]:
+        # Support comma-separated import idioms
+        # i.e. from foo import bar, baz 
         stripped_lines = [
             idiom.strip() for idiom in lines.split("\n") if idiom.strip()
         ]
